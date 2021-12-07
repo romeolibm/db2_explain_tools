@@ -13,13 +13,17 @@
 # to extract the execution plans (db2exfmt) for all statements of a routine
 # after setup phase (only once needed) use the following syntax:
 #
-# db2procEplnAct.sh <db-name> <mode:base|actuals> "<SP call SQL>"
+# Execution phase:
+#  
+#  db2procExplnAct.sh <db-alias> <mode:base|actuals> <sp-call-or-command-starting-with-'db2'>
 #
-# Example if I need to explain as given stored procedure called my_proc
-# accepting two input parameters and an output parameter 
-# on the database named SAMPLE then use the following command
+# Example 1: Explain all statements executed by a routine or simple SQL (one line SQL)
+#  
+#  db2procEplnAct.sh SAMPLE base "call my_proc('param1','param2',?)"
+#  
+# Example 2: Explain all statements executed by shell script  
 #
-# db2procEplnAct.sh SAMPLE base "call my_proc('param1','param2',?)"
+#  db2procExplnAct.sh sample actuals db2_my_sql_script.sh
 #
 # The output of the script will be a .tgz archive following the naming pattern
 #
@@ -61,8 +65,16 @@ phase.
 
   Execution phase:
   
-  db2procExplnAct.sh <db-alias> <mode:base|actuals> <sp-call-or-filename>
+  db2procExplnAct.sh <db-alias> <mode:base|actuals> <sp-call-or-command-starting-with-'db2'>
 
+  Example 1: Explain all statements executed by a routine or simple SQL (one line SQL)
+  
+  db2procExplnAct.sh sample actuals 'call my_sp()'
+  
+  Example 2: Explain all statements executed by shell script  
+
+  db2procExplnAct.sh sample actuals db2_my_sql_script.sh
+  
   The script when sucessful will generate a .tgz archive with the name pattern
   
   db2exfmt_<db-alias>_<current-timestamp>.tgz
@@ -562,7 +574,14 @@ else
 fi	
 
 db2 -v "SET EVENT MONITOR ACTEVMON STATE 1"
-db2 -v "$SQL"
+if [[ "$SQL" =~ ^db2.* ]]; then
+  # the "SQL" is an actual db2 CLI command that will be executed "as is"
+  # use if you need to explain all statements executed by a statement, script or application that
+  # can be executed as a command (shell script)
+  $SQL
+else
+  db2 -v "$SQL"
+fi
 db2 -v "SET EVENT MONITOR ACTEVMON STATE 0"
 db2 -v "call wlm_set_conn_env(null, '<collectactdata>none</collectactdata>')"
 
