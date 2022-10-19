@@ -6,41 +6,230 @@
 # To use, first execute the setup phase against your database if this is the
 # first use or you need to update the database objects
 #
-# Setup phase syntax:
-# 
-# db2procEplnAct.sh <db-name> _setup_
+# General command syntax:
 #
-# to extract the execution plans (db2exfmt) for all statements of a routine
+# db2procEplnAct.sh <required-parameters> [optioanl-parameters]
+#  Where the required and optional parameters are:
+#  -d |--database      |arg[1]  -- DB          required: database name
+#  -m |--mode          |arg[2]  -- MODE        required: mode (_setup_,base,actuals)
+#  -sf|-st|--sql       |arg[3]  -- SQL         required: SQL (file or statement)
+#  -a |--actEvmon      |arg[4]  -- ACTEVMON    optional: activity event monitor name
+#  -k |--pkgEvmon      |arg[5]  -- PKGEVMON    optional: pkg cache event monitor name
+#  -s |--evmonSchema   |arg[6]  -- EVMSCHEMA   optional: event monitors schema (tables)
+#  -t |--evmonTs       |arg[7]  -- EVMTS       optional: event monitors tablespace
+#  -g |--partgrp       |arg[8]  -- EVMPARTGRP  optional: event monitors tablespace storage group
+#  -rs|--routineSchema |arg[9]  -- RTN_SCHEMA  optional: routine schema
+#  -rn|--routineName   |arg[10] -- RTN_NAME    optional: routine name
+#  -x |--exportexpln   |arg[11] -- EXPRT_EXPLN optional: routine name
+#
+# Use cases:
+#
+# Setup phase (optional unless this is the first time usage in your environment):
+#
+# $> db2procExplnAct.sh -d sample -m _setup_ -a actevmon -k pkgevm -t evmonts 
+#
+# or by usign a profile file (db2procExplnActEnv.sh located in the $PWD)
+#
+# $> db2procExplnAct.sh -d sample -m _setup_
+#
+# where the db2procExplnActEnv.sh content is (example values):
+#
+# DB="mydb"
+# MODE="_setup_"
+# ACTEVMON="myactevm"
+# PKGEVMON="mypkgevm"
+# EVMSCHEMA="myevmschema"
+# EVMTS="myevmts"
+# EVMSTOGRP="IBMDEFAULTGROUP"
+#
+# Then, to extract the execution plans (db2exfmt) for all statements of a routine
 # after setup phase (only once needed) use the following syntax:
 #
 # Execution phase:
 #  
-#  db2procExplnAct.sh <db-alias> <mode:base|actuals> <sp-call-or-command-starting-with-'db2'>
-#
 # Example 1: Explain all statements executed by a routine or simple SQL (one line SQL)
 #  
-#  db2procEplnAct.sh SAMPLE base "call my_proc('param1','param2',?)"
+# $> db2procEplnAct.sh -d SAMPLE -m actuals -rn my_proc "call my_proc('param1','param2',?)"
+#
+# $> db2procEplnAct.sh SAMPLE base "call my_proc('param1','param2',?)"
 #  
 # Example 2: Explain all statements executed by shell script  
 #
-#  db2procExplnAct.sh sample actuals db2_my_sql_script.sh
+# $> db2procExplnAct.sh sample actuals db2_my_sql_script.sh
 #
 # The output of the script will be a .tgz archive following the naming pattern
 #
-# db2exfmt_<db-name>_<timestamp>.tgz
+# $> db2exfmt_<db-name>_<timestamp>.tgz
 #
 # Collect the explains including section actuals 
 #
-# db2procEplnAct.sh SAMPLE actuals "call my_proc('param1','param2',?)"
+# $> db2procEplnAct.sh SAMPLE actuals "call my_proc('param1','param2',?)"
 #
 ##############################################################################
+#HELP-END
 
-DB="$1"
-MODE="$2"
-SQL="$3"
+# if there is an environment file use it as parameters are already present 
+if [ -f ./db2procExplnActEnv.sh ]
+then
+	. ./db2procExplnActEnv.sh
+fi
 
-RTN_SCHEMA="USER"
-RTN_NAME="'NONE'"
+##############################################################################
+# The script allows both non positional and positional parameters for the 
+# command this function separates all non positional parameters first and 
+# restore the pure positional array after calling it (set -- ... statement)
+# this allows the script parameters to be overloaded in sequence:
+# 1. db2procExplnActEnv.sh 
+# are overriden from non-positional parameters
+# are overriden by positional parameters
+##############################################################################
+
+POSITIONAL_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -d|--database)
+      DB="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -m|--mode)
+      MODE="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -a|--actEvmon)
+      ACTEVMON="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -k|--pkgEvmon)
+      PKGEVMON="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -s|--evmonSchema)
+      EVMSCHEMA="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -t|--evmonTs)
+      EVMTS="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -g|--partgrp)
+      EVMPARTGRP="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -rs|--routineSchema)
+      RTN_SCHEMA="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -rn|--routineName)
+      RTN_NAME="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -sf|--sqlFile)
+      SQLFILE="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -st|--sql)
+      SQL="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -x|--exportexpln)
+      EXPRT_EXPLN="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -*|--*)
+      echo "Unknown option $1"
+      exit 1
+      ;;
+    *)
+      POSITIONAL_ARGS+=("$1") # save positional arg
+      shift # past argument
+      ;;
+  esac
+done
+
+set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
+
+# pull parameter values from the command file if any are specified
+# and override the environment values
+if [ -n "$1" ]
+then
+	DB="$1"
+fi
+if [ -n "$2" ]
+then
+	MODE="$2"
+fi
+if [ -n "$3" ]
+then
+	SQL="$3"
+fi
+
+if [ -n "$ACTEVMON" ]
+then
+	ACTEVMON="$4"
+fi
+
+if [ -z "$PKGEVMON" ]
+then
+	PKGEVMON="$5"
+fi
+
+if [ -z "$EVMSCHEMA" ]
+then
+	EVMSCHEMA="$6"
+fi
+
+if [ -z "$EVMTS" ]
+then
+	EVMTS="$7"
+fi
+
+if [ -z "$RTN_SCHEMA" ]
+then
+	RTN_SCHEMA="USER"
+fi
+
+if [ -z "$RTN_NAME" ]
+then
+	RTN_NAME="''"
+fi
+
+if [ -z "$ACTEVMON" ]
+then
+	ACTEVMON="ACTEVMON"
+fi
+
+if [ -z "$PKGEVNON" ]
+then
+	PKGEVMON="PKGEVMON"
+fi
+
+if [ -z "$EVMSCHEMA" ]
+then
+	EVMSCHEMA="SYSTOOLS"
+fi
+
+if [ -z "$EVMTS" ]
+then
+	EVMTS="MONSPACE"
+fi
+
+if [ -z "$EVMPARTGRP" ]
+then
+  EVMPARTGRP="IBMDEFAULTGROUP"
+fi
 
 if [ -z "$DB" ]
 then
@@ -49,41 +238,15 @@ fi
 
 if [ "$DB" == "--help" ]
 then
-	cat << EOF
-------------------------------------------------------------------------------
-
-A script used to execute explain from activity bulk explains for a given
-routine call or script you provide as the last parameter of this script.
-	
-When used for the first time, or the version of the stored procedure 
-defined and used by the script changes you need to execute the setup
-phase.
-
-  Setup phase:
-  
-  db2procExplnAct.sh <db-alias> _setup_
-
-  Execution phase:
-  
-  db2procExplnAct.sh <db-alias> <mode:base|actuals> <sp-call-or-command-starting-with-'db2'>
-
-  Example 1: Explain all statements executed by a routine or simple SQL (one line SQL)
-  
-  db2procExplnAct.sh sample actuals 'call my_sp()'
-  
-  Example 2: Explain all statements executed by shell script  
-
-  db2procExplnAct.sh sample actuals db2_my_sql_script.sh
-  
-  The script when sucessful will generate a .tgz archive with the name pattern
-  
-  db2exfmt_<db-alias>_<current-timestamp>.tgz
-  
-  the file is usuely sent to the IBM SMEs for RCA (via ECUREP) 
-
-------------------------------------------------------------------------------
-EOF
-  exit 100
+	while read line 
+	do
+		if [ "${line}" = "#HELP-END" ]
+		then
+			exit 1
+		fi
+		echo ${line}
+	done < $0
+	exit 0
 fi
 
 if [ -z "$MODE" ]
@@ -108,7 +271,7 @@ fi
 
 if [ "$MODE" != "_setup_" ]
 then
-	if [ -z "$SQL" ]
+	if [ -z "$SQL" -a -z "$SQLFILE" ]
 	then
 	  echo "A SQL call statement must be specified as second parameter of this script!"
 	  exit 1
@@ -117,47 +280,79 @@ fi
 
 if [ "$MODE" == "_setup_" ]
 then
+	cat << EOF > db2procExplnActEnv.sh
+MODE=actuals
+DB=$DB
+ACTEVMON=$ACTEVMON
+PKGEVMON=$PKGEVMON
+EVMSCHEMA=$EVMSCHEMA
+EVMTS=$EVMTS
+EVMPARTGRP=$EVMPARTGRP
+RTN_SCHEMA=$RTN_SCHEMA
+RTN_NAME=$RTN_NAME
+SQL=$SQL
+EOF
+    chmod ug+x db2procExplnActEnv.sh
+    
   	cat << EOF > db2exfmtsetup.sql
-create tablespace monspace in IBMDEFAULTGROUP managed by automatic storage
+create tablespace $EVMTS IN DATABASE PARTITION GROUP $EVMPARTGRP managed by automatic storage
 @
 CALL SYSPROC.SYSINSTALLOBJECTS('EXPLAIN', 'C', CAST (NULL AS VARCHAR(128)), USER)
 @
-CREATE EVENT MONITOR ACTEVMON
+CREATE EVENT MONITOR $ACTEVMON
        FOR ACTIVITIES
        WRITE TO TABLE
-       ACTIVITY (TABLE ACTIVITY_ACTEVMON
-                 IN MONSPACE
-                 PCTDEACTIVATE 100),
-       ACTIVITYMETRICS (TABLE ACTIVITYMETRICS_ACTEVMON
-                        IN MONSPACE
-                        PCTDEACTIVATE 100),
-       ACTIVITYSTMT (TABLE ACTIVITYSTMT_ACTEVMON
-                     IN MONSPACE
-                     PCTDEACTIVATE 100),
-       ACTIVITYVALS (TABLE ACTIVITYVALS_ACTEVMON
-                     IN MONSPACE
-                     PCTDEACTIVATE 100),
-       CONTROL (TABLE CONTROL_ACTEVMON
-                IN MONSPACE
-                PCTDEACTIVATE 100)
+       ACTIVITY (
+            TABLE $EVMSCHEMA.ACTIVITY_ACTEVMON
+            IN $EVMTS
+            PCTDEACTIVATE 100
+       ),
+       ACTIVITYMETRICS (
+            TABLE $EVMSCHEMA.ACTIVITYMETRICS_ACTEVMON
+            IN $EVMTS
+            PCTDEACTIVATE 100
+       ),
+       ACTIVITYSTMT (
+            TABLE $EVMSCHEMA.ACTIVITYSTMT_ACTEVMON
+            IN $EVMTS
+            PCTDEACTIVATE 100
+       ),
+       ACTIVITYVALS (
+            TABLE $EVMSCHEMA.ACTIVITYVALS_ACTEVMON
+            IN $EVMTS
+            PCTDEACTIVATE 100\
+       ),
+       CONTROL (
+            TABLE $EVMSCHEMA.CONTROL_ACTEVMON
+            IN $EVMTS
+            PCTDEACTIVATE 100
+       )
        MANUALSTART
 @
 
-CREATE EVENT MONITOR PKGEVMON
+CREATE EVENT MONITOR $PKGEVMON
        FOR PACKAGE CACHE
        WRITE TO TABLE
-       PKGCACHE (TABLE PKGCACHE_PKGEVMON
-                 IN MONSPACE
-                 PCTDEACTIVATE 100),
-       PKGCACHE_METRICS (TABLE PKGCACHE_METRICS_PKGEVMON
-                        IN MONSPACE
-                        PCTDEACTIVATE 100),
-       PKGCACHE_STMT_ARGS (TABLE PKGCACHE_STMT_ARGS_PKGEVMON
-                        IN MONSPACE
-                        PCTDEACTIVATE 100),
-       CONTROL (TABLE CONTROL_PKGEVMON
-                IN MONSPACE
-                PCTDEACTIVATE 100)
+       PKGCACHE (
+           TABLE $EVMSCHEMA.PKGCACHE_PKGEVMON
+           IN $EVMTS
+           PCTDEACTIVATE 100
+       ),
+       PKGCACHE_METRICS (
+            TABLE $EVMSCHEMA.PKGCACHE_METRICS_PKGEVMON
+            IN $EVMTS
+            PCTDEACTIVATE 100
+       ),
+       PKGCACHE_STMT_ARGS (
+            TABLE $EVMSCHEMA.PKGCACHE_STMT_ARGS_PKGEVMON
+            IN $EVMTS
+            PCTDEACTIVATE 100
+       ),
+       CONTROL (
+            TABLE $EVMSCHEMA.CONTROL_PKGEVMON
+            IN $EVMTS
+            PCTDEACTIVATE 100
+       )
        MANUALSTART
 @
 
@@ -177,7 +372,7 @@ explain_from_section
   in p_rtn_name        varchar(128),
   in p_max_stmts       int default 20,
   in p_expln_src       varchar(64) default 'activity',
-  in p_evmon_in        varchar(128) default 'ACTEVMON',
+  in p_evmon_in        varchar(128) default '$ACTEVMON',
   in explain_schema_in varchar(128) default USER
 )
 specific explain_from_section
@@ -283,7 +478,7 @@ begin
 		'order by 2 desc'
 		||case when p_max_stmts=0 
 		       then '' 
-		       else ' fetch first '||coalescE(p_max_stmts,'NULL')||' rows only' 
+		       else ' fetch first '||coalesce(p_max_stmts,'NULL')||' rows only' 
 		   end
 		;
 	elseif (p_expln_src = 'activity') then
@@ -504,8 +699,8 @@ begin
        ||'varchar(s.stmt_text,200) stmt_text, ' 
        ||'length(s.section_env) as section_len '
 	||'from '
-  		||'ACTIVITY_ACTEVMON a, '
-  		||'ACTIVITYSTMT_ACTEVMON s '
+  		||'$EVMSCHEMA.ACTIVITY_ACTEVMON a, '
+  		||'$EVMSCHEMA.ACTIVITYSTMT_ACTEVMON s '
 	||'where a.appl_id = '''||APPL_ID_v||'''' 
 	||' and a.appl_id = s.appl_id '
 	||' and a.uow_id = s.uow_id '
@@ -525,8 +720,8 @@ begin
 		||'dec((max(a.act_exec_time) / 1e6),8,3) as max_etime,'
                 || colset1
 		||' from '
-		||' ACTIVITY_ACTEVMON a,'
-		||' ACTIVITYSTMT_ACTEVMON s'
+		||' $EVMSCHEMA.ACTIVITY_ACTEVMON a,'
+		||' $EVMSCHEMA.ACTIVITYSTMT_ACTEVMON s'
 		||' where a.appl_id = '''||APPL_ID_v||'''' 
 		||' and a.appl_id = s.appl_id '
 		||' and a.uow_id = s.uow_id '
@@ -559,11 +754,11 @@ fi
 
 db2 -v connect to $DB
 db2 -v "truncate db2EXFMT_STMTS immediate"
-db2 -v "truncate ACTIVITY_ACTEVMON immediate"
-db2 -v "truncate ACTIVITYMETRICS_ACTEVMON immediate"
-db2 -v "truncate ACTIVITYSTMT_ACTEVMON immediate"
-db2 -v "truncate ACTIVITYVALS_ACTEVMON immediate"
-db2 -v "truncate CONTROL_ACTEVMON immediate"
+db2 -v "truncate $EVMSCHEMA.ACTIVITY_ACTEVMON immediate"
+db2 -v "truncate $EVMSCHEMA.ACTIVITYMETRICS_ACTEVMON immediate"
+db2 -v "truncate $EVMSCHEMA.ACTIVITYSTMT_ACTEVMON immediate"
+db2 -v "truncate $EVMSCHEMA.ACTIVITYVALS_ACTEVMON immediate"
+db2 -v "truncate $EVMSCHEMA.CONTROL_ACTEVMON immediate"
 db2 -v "delete from explain_instance"
 
 if [ "$MODE" == "actuals" ]
@@ -573,20 +768,20 @@ else
  db2 -v "call wlm_set_conn_env(null, '<collectactdata>with details, section</collectactdata><collectactpartition>ALL</collectactpartition>')"
 fi	
 
-db2 -v "SET EVENT MONITOR ACTEVMON STATE 1"
-if [[ "$SQL" =~ ^db2.* ]]; then
-  # the "SQL" is an actual db2 CLI command that will be executed "as is"
-  # use if you need to explain all statements executed by a statement, script or application that
-  # can be executed as a command (shell script)
-  $SQL
+db2 -v "SET EVENT MONITOR $ACTEVMON STATE 1"
+
+if [ -z "$SQL" ]
+then
+  db2 -v "$SQLFILE"
 else
-  db2 -v "$SQL"
+  db2 $SQL
 fi
-db2 -v "SET EVENT MONITOR ACTEVMON STATE 0"
+db2 -v "SET EVENT MONITOR $ACTEVMON STATE 0"
 db2 -v "call wlm_set_conn_env(null, '<collectactdata>none</collectactdata>')"
 
-db2 -v "call explain_from_section(${RTN_SCHEMA},${RTN_NAME},0,'activity','ACTEVMON')"
+db2 -v "call explain_from_section('${RTN_SCHEMA}','${RTN_NAME}',0,'activity','$ACTEVMON')"
 db2 -x "select stmt from DB2EXFMT_STMTS ORDER BY INS_TS" >> db2exfmtall.sh
+
 chmod a+x db2exfmtall.sh
 ./db2exfmtall.sh > db2exfmtall.log 2>&1
 rm *.exfmt db2exfmt*.txt db2exfmt*.log db2exfmtall.sh 

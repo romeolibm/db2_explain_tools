@@ -2,6 +2,8 @@
 ###################################################################
 # Collects (headers and csv export with lobs)
 # 
+# Syntax db2exportPerfInfo.sh <database> [num-naps=1] [snap-interval-sec=10] 
+#
 # MG_DB="select * from table(MON_GET_DATABASE(-2))"
 # MG_CON="select * from table(MON_GET_CONNECTION(NULL,-2,1))"
 # MG_LCK="select * from table(MON_GET_LOCKS(NULL,-2))"
@@ -136,8 +138,8 @@ do
 	db2 "export to mon_get_table_$TS.csv of del $MG_TABLE"  >> export.log 2>&1
 	
 	echo "Export $MG_PKGCHS"
-	mkdir -p mon_get_pkgchs_lob_$TS
-	db2 "export to mon_get_pkgchs_$TS.csv of del lobs to mon_get_pkgchs_lob_$TS $MG_PKGCHS" >> export.log 2>&1
+	mkdir -p mon_get_pkgcache_lob_$TS
+	db2 "export to mon_get_pkgcache_$TS.csv of del lobs to mon_get_pkgcache_lob_$TS $MG_PKGCHS" >> export.log 2>&1
 	
 	if [ "$GET_DB2PD_LATCHES" == "$YES" ]
 	then
