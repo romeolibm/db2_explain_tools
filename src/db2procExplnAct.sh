@@ -49,7 +49,7 @@
 #  
 # Example 1: Explain all statements executed by a routine or simple SQL (one line SQL)
 #  
-# $> db2procEplnAct.sh -d SAMPLE -m actuals -rn my_proc "call my_proc('param1','param2',?)"
+# $> db2procEplnAct.sh -d SAMPLE -m actuals -rn my_proc -st "call my_proc('param1','param2',?)"
 #
 # $> db2procEplnAct.sh SAMPLE base "call my_proc('param1','param2',?)"
 #  
@@ -59,7 +59,7 @@
 #
 # The output of the script will be a .tgz archive following the naming pattern
 #
-# $> db2exfmt_<db-name>_<timestamp>.tgz
+# db2exfmt_<db-name>_<timestamp>.tgz
 #
 # Collect the explains including section actuals 
 #
