@@ -772,9 +772,9 @@ db2 -v "SET EVENT MONITOR $ACTEVMON STATE 1"
 
 if [ -z "$SQL" ]
 then
-  db2 -v "$SQLFILE"
+  db2 -v -t "$SQLFILE"
 else
-  db2 $SQL
+  db2 -v $SQL
 fi
 db2 -v "SET EVENT MONITOR $ACTEVMON STATE 0"
 db2 -v "call wlm_set_conn_env(null, '<collectactdata>none</collectactdata>')"
