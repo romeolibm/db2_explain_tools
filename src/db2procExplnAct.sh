@@ -213,7 +213,7 @@ if [ -z "$ACTEVMON" ]
 then
 	ACTEVMON="ACTEVMON"
 else
-  if[ -z "$EVMSCHEMA" ]
+  if [ -z "$EVMSCHEMA" ]
   then
      echo "If you specify a custom event monitor name you msut specify the schema (-s flag) where the event monitor tables are created also!"
      exit 100
