@@ -51,6 +51,9 @@
 #  
 # $> db2procEplnAct.sh -d SAMPLE -m actuals -rn my_proc -st "call my_proc('param1','param2',?)"
 #
+# or if you have the routine in a different schema:
+# $> db2procEplnAct.sh -d SAMPLE -m actuals -rs rt_schema -rn my_proc -st "call rt_schema.my_proc('param1','param2',?)"
+#
 # $> db2procEplnAct.sh SAMPLE base "call my_proc('param1','param2',?)"
 #  
 # Example 2: Explain all statements executed by shell script  
