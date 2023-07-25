@@ -179,22 +179,22 @@ then
 	SQL="$3"
 fi
 
-if [ -n "$ACTEVMON" ]
+if [ -n "$4" ]
 then
 	ACTEVMON="$4"
 fi
 
-if [ -z "$PKGEVMON" ]
+if [ -n "$5" ]
 then
 	PKGEVMON="$5"
 fi
 
-if [ -z "$EVMSCHEMA" ]
+if [ -n "$6" ]
 then
 	EVMSCHEMA="$6"
 fi
 
-if [ -z "$EVMTS" ]
+if [ -n "$7" ]
 then
 	EVMTS="$7"
 fi
